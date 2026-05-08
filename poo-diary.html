@@ -10,7 +10,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
   --bg-primary: #1a1128;
@@ -897,15 +896,13 @@ const STORAGE_KEY = 'poo-diary-records';
 // ===== SUPABASE =====
 const SUPABASE_URL = 'https://vrvmwboedfuhopxlgzvh.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZydm13Ym9lZGZ1aG9weGxnenZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNDE3NjgsImV4cCI6MjA5MzgxNzc2OH0.l5tgAYqrAMUF4XOC6OjGnoahErc0Z7NyFwPUU0l5nB0';
-
-let sb = null;
-try {
-  if (window.supabase && window.supabase.createClient) {
-    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-  }
-} catch(e) {
-  console.warn('Supabase client failed to init, using localStorage');
-}
+const API = `${SUPABASE_URL}/rest/v1`;
+const HEADERS = {
+  'apikey': SUPABASE_ANON,
+  'Authorization': `Bearer ${SUPABASE_ANON}`,
+  'Content-Type': 'application/json',
+  'Prefer': 'return=representation'
+};
 const PAGE_ORDER = ['record', 'history', 'stats'];
 
 const COLOR_MAP = {
@@ -940,29 +937,22 @@ const SMOOTHNESS_TEXTS = [
 
 // ===== DATA =====
 async function loadRecords() {
-  if (sb) {
-    try {
-      const { data, error } = await sb
-        .from('poo_records')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      
-      records = (data || []).map(r => ({
-        id: r.id,
-        date: r.created_at,
-        status: r.status,
-        color: r.color,
-        smoothness: r.smoothness,
-        mood: r.mood
-      }));
-      return;
-    } catch(e) {
-      console.error('Supabase load failed, falling back:', e);
-    }
+  try {
+    const res = await fetch(`${API}/poo_records?select=*&order=created_at.desc`, { headers: HEADERS });
+    if (!res.ok) throw new Error(res.statusText);
+    const data = await res.json();
+    records = data.map(r => ({
+      id: r.id,
+      date: r.created_at,
+      status: r.status,
+      color: r.color,
+      smoothness: r.smoothness,
+      mood: r.mood
+    }));
+    return;
+  } catch(e) {
+    console.error('API load failed, falling back:', e);
   }
-  // Fallback to localStorage
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     records = stored ? JSON.parse(stored) : [];
@@ -970,48 +960,39 @@ async function loadRecords() {
 }
 
 async function saveRecord(record) {
-  if (sb) {
-    try {
-      const { error } = await sb
-        .from('poo_records')
-        .insert({
-          status: record.status,
-          color: record.color,
-          smoothness: record.smoothness,
-          mood: record.mood
-        });
-      
-      if (error) throw error;
-      await loadRecords();
-      return;
-    } catch(e) {
-      console.error('Supabase save failed, using localStorage:', e);
-    }
+  try {
+    const res = await fetch(`${API}/poo_records`, {
+      method: 'POST',
+      headers: HEADERS,
+      body: JSON.stringify({
+        status: record.status,
+        color: record.color,
+        smoothness: record.smoothness,
+        mood: record.mood
+      })
+    });
+    if (!res.ok) throw new Error(res.statusText);
+    await loadRecords();
+    return;
+  } catch(e) {
+    console.error('API save failed, using localStorage:', e);
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
 }
 
 async function removeRecord(id) {
-  if (sb) {
-    try {
-      const { error } = await sb
-        .from('poo_records')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-      records = records.filter(r => r.id !== id);
-      return;
-    } catch(e) {
-      console.error('Supabase delete failed:', e);
-    }
+  try {
+    const res = await fetch(`${API}/poo_records?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: HEADERS
+    });
+    if (!res.ok) throw new Error(res.statusText);
+    records = records.filter(r => r.id !== id);
+    return;
+  } catch(e) {
+    console.error('API delete failed:', e);
   }
   records = records.filter(r => r.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-}
-
-function saveRecords() {
-  // Legacy fallback, no longer primary
   localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
 }
 
