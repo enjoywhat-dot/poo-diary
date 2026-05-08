@@ -1,0 +1,1452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Poo Diary 💩</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1a1128">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --bg-primary: #1a1128;
+  --bg-secondary: #241838;
+  --bg-card: #2d2044;
+  --bg-card-hover: #362650;
+  --accent-pink: #ff6b9d;
+  --accent-purple: #c084fc;
+  --accent-blue: #67e8f9;
+  --accent-yellow: #fcd34d;
+  --accent-green: #86efac;
+  --accent-orange: #fb923c;
+  --text-primary: #f8f0ff;
+  --text-secondary: #b8a0d0;
+  --text-muted: #7c6894;
+  --blush: rgba(255, 107, 157, 0.5);
+  --shadow-glow: 0 0 30px rgba(192, 132, 252, 0.15);
+  --radius: 20px;
+  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+body {
+  font-family: 'Quicksand', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: 
+    radial-gradient(ellipse at 20% 20%, rgba(192, 132, 252, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(255, 107, 157, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(103, 232, 249, 0.04) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ===== NAV ===== */
+.nav {
+  position: fixed;
+  bottom: 0;
+  left: 0; right: 0;
+  background: rgba(36, 24, 56, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(192, 132, 252, 0.15);
+  display: flex;
+  justify-content: space-around;
+  padding: 6px 0 max(6px, env(safe-area-inset-bottom));
+  z-index: 100;
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 20px;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: var(--transition);
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-family: 'Quicksand', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  position: relative;
+}
+
+.nav-item.active {
+  color: var(--accent-purple);
+  background: rgba(192, 132, 252, 0.1);
+}
+
+.nav-item .nav-icon {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.nav-item.active .nav-icon {
+  transform: translateY(-2px);
+}
+
+/* Tab icon animations */
+@keyframes nose-pinch {
+  0% { transform: scale(1); }
+  30% { transform: scale(0.85, 1.1); }
+  60% { transform: scale(1.1, 0.9); }
+  100% { transform: scale(1); }
+}
+
+@keyframes pen-write {
+  0% { transform: rotate(0deg); }
+  25% { transform: rotate(-12deg); }
+  50% { transform: rotate(8deg); }
+  75% { transform: rotate(-5deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes magnify-wobble {
+  0% { transform: scale(1) rotate(0deg); }
+  25% { transform: scale(1.15) rotate(-8deg); }
+  50% { transform: scale(1.05) rotate(5deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+.nav-item.anim-record .nav-icon { animation: nose-pinch 0.4s ease; }
+.nav-item.anim-history .nav-icon { animation: pen-write 0.4s ease; }
+.nav-item.anim-stats .nav-icon { animation: magnify-wobble 0.4s ease; }
+
+.nav-item svg { width: 24px; height: 24px; }
+
+/* ===== PAGES ===== */
+.page {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  min-height: 100vh;
+  padding: 24px 20px 100px;
+  z-index: 1;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.page.enter-right {
+  transform: translateX(40px);
+}
+
+.page.enter-left {
+  transform: translateX(-40px);
+}
+
+.page.active {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: all;
+  position: relative;
+}
+
+.page.exit-left {
+  opacity: 0;
+  transform: translateX(-40px);
+}
+
+.page.exit-right {
+  opacity: 0;
+  transform: translateX(40px);
+}
+
+/* ===== RECORD PAGE ===== */
+.page-title {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 8px;
+  background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.page-subtitle {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-bottom: 28px;
+  font-weight: 500;
+}
+
+.poo-stage {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  margin-bottom: 24px;
+  perspective: 800px;
+}
+
+.poo-character {
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+  animation: float 3s ease-in-out infinite;
+}
+
+.poo-character:active { transform: scale(0.92); }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes bounce {
+  0% { transform: scale(1); }
+  25% { transform: scale(1.15, 0.85); }
+  50% { transform: scale(0.9, 1.1); }
+  75% { transform: scale(1.05, 0.95); }
+  100% { transform: scale(1); }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-8deg); }
+  75% { transform: rotate(8deg); }
+}
+
+.poo-character.bounce { animation: bounce 0.5s ease; }
+.poo-character.spin { animation: spin 0.6s ease; }
+.poo-character.wiggle { animation: wiggle 0.4s ease; }
+
+.poo-shadow {
+  position: absolute;
+  bottom: -15px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 16px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 50%;
+  filter: blur(6px);
+  animation: shadow-pulse 3s ease-in-out infinite;
+}
+
+@keyframes shadow-pulse {
+  0%, 100% { transform: translateX(-50%) scale(1); opacity: 0.3; }
+  50% { transform: translateX(-50%) scale(0.85); opacity: 0.2; }
+}
+
+.poo-svg { width: 140px; height: 160px; filter: drop-shadow(0 8px 16px rgba(0,0,0,0.3)); }
+
+/* ===== SECTION CARDS ===== */
+.section-card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(192, 132, 252, 0.1);
+  box-shadow: var(--shadow-glow);
+  transition: var(--transition);
+}
+
+.section-label {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent-purple);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 14px;
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.status-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  background: var(--bg-secondary);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: var(--transition);
+  border: 2px solid transparent;
+  font-family: 'Quicksand', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.status-option:active { transform: scale(0.96); }
+.status-option.selected {
+  border-color: var(--accent-purple);
+  background: rgba(192, 132, 252, 0.15);
+}
+
+.status-emoji { font-size: 24px; }
+
+.color-grid {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.color-option {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: var(--transition);
+  border: 3px solid transparent;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.color-option:active { transform: scale(0.9); }
+.color-option.selected {
+  border-color: var(--accent-purple);
+  box-shadow: 0 0 20px rgba(192, 132, 252, 0.4);
+  transform: scale(1.1);
+}
+
+.color-option .color-fill {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+.color-label {
+  position: absolute;
+  bottom: -20px;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.smoothness-container { display: flex; flex-direction: column; gap: 12px; }
+.smoothness-display { display: flex; justify-content: space-between; align-items: center; }
+.smoothness-value {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--accent-purple);
+}
+.smoothness-text { font-size: 14px; color: var(--text-secondary); font-weight: 600; }
+
+.slider-track {
+  position: relative;
+  height: 8px;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.slider-fill {
+  position: absolute;
+  left: 0; top: 0;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--accent-pink), var(--accent-purple));
+  transition: width 0.2s ease;
+}
+
+.slider-thumb {
+  position: absolute;
+  top: 50%;
+  width: 28px;
+  height: 28px;
+  background: var(--text-primary);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  cursor: grab;
+  transition: transform 0.15s ease;
+}
+
+.slider-thumb:active { transform: translate(-50%, -50%) scale(1.2); cursor: grabbing; }
+
+.mood-grid { display: flex; justify-content: space-around; gap: 8px; }
+
+.mood-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: var(--transition);
+  border: 2px solid transparent;
+  background: var(--bg-secondary);
+  min-width: 58px;
+}
+
+.mood-option:active { transform: scale(0.92); }
+.mood-option.selected {
+  border-color: var(--accent-yellow);
+  background: rgba(252, 211, 77, 0.1);
+}
+
+.mood-emoji { font-size: 32px; transition: transform 0.3s ease; }
+.mood-option.selected .mood-emoji { transform: scale(1.2); }
+.mood-label { font-size: 11px; color: var(--text-muted); font-weight: 600; }
+
+.submit-btn {
+  width: 100%;
+  padding: 18px;
+  border: none;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+  color: white;
+  font-family: 'Fredoka', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+  margin-top: 8px;
+  letter-spacing: 0.5px;
+  position: relative;
+  overflow: hidden;
+}
+
+.submit-btn:active { transform: scale(0.97); }
+
+/* Flush Animation */
+.flush-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--bg-primary);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.flush-overlay.active { opacity: 1; pointer-events: all; }
+
+.flush-swirl { position: relative; width: 200px; height: 200px; }
+
+.flush-water {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 4px solid var(--accent-blue);
+  border-top-color: transparent;
+  opacity: 0;
+}
+
+.flush-water.animate { animation: swirl 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+
+@keyframes swirl {
+  0% { transform: rotate(0deg) scale(1); opacity: 0.8; }
+  70% { transform: rotate(720deg) scale(0.5); opacity: 0.6; }
+  100% { transform: rotate(1080deg) scale(0); opacity: 0; }
+}
+
+.flush-poo-wrapper {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.flush-poo-wrapper.animate {
+  animation: flush-down 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes flush-down {
+  0% { transform: translate(-50%, -50%) rotate(0deg) scale(1); opacity: 1; }
+  50% { transform: translate(-50%, -50%) rotate(360deg) scale(0.7); opacity: 0.8; }
+  100% { transform: translate(-50%, 100%) rotate(720deg) scale(0); opacity: 0; }
+}
+
+.flush-text {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 24px;
+  color: var(--accent-blue);
+  margin-top: 30px;
+  opacity: 0;
+}
+
+.flush-text.show { animation: fade-up 0.5s ease 1s forwards; }
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.flush-success {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 18px;
+  color: var(--accent-green);
+  opacity: 0;
+}
+
+.flush-success.show { animation: fade-up 0.5s ease 1.8s forwards; }
+
+/* ===== HISTORY PAGE ===== */
+.history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.month-nav { display: flex; align-items: center; gap: 16px; }
+
+.month-nav-btn {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  border: 1px solid rgba(192, 132, 252, 0.2);
+  color: var(--text-primary);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: var(--transition);
+  font-size: 16px;
+}
+
+.month-nav-btn:active { transform: scale(0.9); background: var(--bg-card-hover); }
+
+.month-label {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 18px; font-weight: 600;
+  color: var(--text-primary);
+  min-width: 140px; text-align: center;
+}
+
+.history-list { display: flex; flex-direction: column; gap: 12px; }
+
+.history-card {
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid rgba(192, 132, 252, 0.08);
+  animation: card-in 0.4s ease backwards;
+  transition: var(--transition);
+}
+
+.history-card:active { transform: scale(0.98); background: var(--bg-card-hover); }
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.history-poo-svg { width: 44px; height: 50px; flex-shrink: 0; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
+
+.history-info { flex: 1; min-width: 0; }
+
+.history-date {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 14px;
+  color: var(--accent-purple);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.history-details { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.history-tag {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.history-mood { font-size: 24px; flex-shrink: 0; }
+
+.empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+.empty-state-emoji { font-size: 64px; margin-bottom: 16px; }
+.empty-state-text {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 18px; margin-bottom: 8px;
+  color: var(--text-secondary);
+}
+.empty-state-sub { font-size: 14px; }
+
+/* ===== STATS PAGE ===== */
+.stat-card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(192, 132, 252, 0.1);
+  box-shadow: var(--shadow-glow);
+}
+
+.stat-number {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 48px; font-weight: 700;
+  background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.stat-label { font-size: 14px; color: var(--text-secondary); font-weight: 600; margin-top: 4px; }
+.stat-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.mood-stat-grid { display: flex; justify-content: space-around; padding: 8px 0; }
+.mood-stat-item { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.mood-stat-emoji { font-size: 28px; }
+.mood-stat-count { font-family: 'Fredoka', sans-serif; font-size: 20px; font-weight: 700; color: var(--text-primary); }
+.mood-stat-label { font-size: 11px; color: var(--text-muted); font-weight: 600; }
+
+.streak-display { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 0; }
+
+.streak-day {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+  transition: var(--transition);
+}
+
+.streak-day.filled { background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink)); }
+.streak-day.empty { background: var(--bg-secondary); border: 1px dashed rgba(192, 132, 252, 0.2); }
+
+.smoothness-chart { display: flex; align-items: flex-end; gap: 6px; height: 100px; padding: 8px 0; }
+
+.chart-bar-wrapper { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; }
+
+.chart-bar {
+  width: 100%;
+  border-radius: 6px 6px 0 0;
+  background: linear-gradient(180deg, var(--accent-purple), var(--accent-pink));
+  transition: height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 4px;
+  margin-top: auto;
+}
+
+.chart-label { font-size: 10px; color: var(--text-muted); font-weight: 600; }
+
+.delete-btn {
+  background: none; border: none;
+  color: var(--accent-pink);
+  font-size: 12px; padding: 4px 8px;
+  cursor: pointer; opacity: 0.6;
+  transition: var(--transition);
+  font-family: 'Quicksand', sans-serif; font-weight: 600;
+}
+.delete-btn:active { opacity: 1; }
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--bg-card); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<!-- ===== RECORD PAGE ===== -->
+<div class="page active" id="page-record">
+  <div class="page-title">Poo Diary</div>
+  <div class="page-subtitle">How was your visit today? 🚽</div>
+  
+  <div class="poo-stage">
+    <div class="poo-character" id="main-poo" onclick="pokePoo()">
+      <div class="poo-shadow"></div>
+      <svg class="poo-svg" id="poo-svg" viewBox="0 0 140 160"></svg>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="section-label">💫 How'd it go?</div>
+    <div class="status-grid">
+      <div class="status-option" data-status="happy" onclick="selectStatus(this)">
+        <span class="status-emoji">😊</span> Smooth
+      </div>
+      <div class="status-option" data-status="struggle" onclick="selectStatus(this)">
+        <span class="status-emoji">😣</span> Struggle
+      </div>
+      <div class="status-option" data-status="great" onclick="selectStatus(this)">
+        <span class="status-emoji">🤩</span> Glorious
+      </div>
+      <div class="status-option" data-status="constipated" onclick="selectStatus(this)">
+        <span class="status-emoji">😤</span> Stuck
+      </div>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="section-label">🎨 Color check</div>
+    <div class="color-grid">
+      <div class="color-option selected" data-color="brown" onclick="selectColor(this)">
+        <div class="color-fill" style="background: #8B6914;"></div>
+        <span class="color-label">Healthy</span>
+      </div>
+      <div class="color-option" data-color="dark" onclick="selectColor(this)">
+        <div class="color-fill" style="background: #5C4A1E;"></div>
+        <span class="color-label">Dark</span>
+      </div>
+      <div class="color-option" data-color="light" onclick="selectColor(this)">
+        <div class="color-fill" style="background: #C49A2A;"></div>
+        <span class="color-label">Light</span>
+      </div>
+      <div class="color-option" data-color="green" onclick="selectColor(this)">
+        <div class="color-fill" style="background: #6B8E23;"></div>
+        <span class="color-label">Green</span>
+      </div>
+      <div class="color-option" data-color="yellow" onclick="selectColor(this)">
+        <div class="color-fill" style="background: #DAA520;"></div>
+        <span class="color-label">Yellow</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="section-label">✨ Smoothness</div>
+    <div class="smoothness-container">
+      <div class="smoothness-display">
+        <span class="smoothness-value" id="smoothness-val">5</span>
+        <span class="smoothness-text" id="smoothness-text">Pretty decent</span>
+      </div>
+      <div class="slider-track" id="slider-track">
+        <div class="slider-fill" id="slider-fill" style="width: 50%"></div>
+        <div class="slider-thumb" id="slider-thumb" style="left: 50%"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="section-label">🧠 Mood while pooping</div>
+    <div class="mood-grid">
+      <div class="mood-option" data-mood="zen" onclick="selectMood(this)">
+        <span class="mood-emoji">😌</span>
+        <span class="mood-label">Zen</span>
+      </div>
+      <div class="mood-option" data-mood="happy" onclick="selectMood(this)">
+        <span class="mood-emoji">😄</span>
+        <span class="mood-label">Happy</span>
+      </div>
+      <div class="mood-option" data-mood="meh" onclick="selectMood(this)">
+        <span class="mood-emoji">😐</span>
+        <span class="mood-label">Meh</span>
+      </div>
+      <div class="mood-option" data-mood="stressed" onclick="selectMood(this)">
+        <span class="mood-emoji">😰</span>
+        <span class="mood-label">Stressed</span>
+      </div>
+      <div class="mood-option" data-mood="phone" onclick="selectMood(this)">
+        <span class="mood-emoji">📱</span>
+        <span class="mood-label">Scrolling</span>
+      </div>
+    </div>
+  </div>
+
+  <button class="submit-btn" id="submit-btn" onclick="submitRecord()">
+    🚽 Flush & Record!
+  </button>
+</div>
+
+<!-- ===== HISTORY PAGE ===== -->
+<div class="page" id="page-history">
+  <div class="page-title">History</div>
+  <div class="page-subtitle">Your poo-st memories 📖</div>
+  
+  <div class="history-header">
+    <div class="month-nav">
+      <button class="month-nav-btn" onclick="changeMonth(-1)">‹</button>
+      <span class="month-label" id="month-label"></span>
+      <button class="month-nav-btn" onclick="changeMonth(1)">›</button>
+    </div>
+  </div>
+  
+  <div class="history-list" id="history-list"></div>
+</div>
+
+<!-- ===== STATS PAGE ===== -->
+<div class="page" id="page-stats">
+  <div class="page-title">Stats</div>
+  <div class="page-subtitle">Your poop analytics 📊</div>
+  
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="stat-number" id="total-count">0</div>
+      <div class="stat-label">Total Records</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number" id="avg-smooth">-</div>
+      <div class="stat-label">Avg Smoothness</div>
+    </div>
+  </div>
+  
+  <div class="stat-card">
+    <div class="section-label">📅 This week</div>
+    <div class="streak-display" id="streak-display"></div>
+  </div>
+  
+  <div class="stat-card">
+    <div class="section-label">😊 Mood breakdown</div>
+    <div class="mood-stat-grid" id="mood-stats"></div>
+  </div>
+
+  <div class="stat-card">
+    <div class="section-label">📈 Smoothness this week</div>
+    <div class="smoothness-chart" id="smoothness-chart"></div>
+  </div>
+</div>
+
+<!-- ===== FLUSH OVERLAY ===== -->
+<div class="flush-overlay" id="flush-overlay">
+  <div class="flush-swirl">
+    <div class="flush-water" id="flush-water"></div>
+    <div class="flush-water" id="flush-water-2" style="border-color: var(--accent-purple); border-top-color: transparent;"></div>
+    <div class="flush-poo-wrapper" id="flush-poo">
+      <svg width="60" height="70" viewBox="0 0 140 160" id="flush-poo-svg"></svg>
+    </div>
+  </div>
+  <div class="flush-text" id="flush-text">Flushing away... 💦</div>
+  <div class="flush-success" id="flush-success">Recorded! See you next time 💩</div>
+</div>
+
+<!-- ===== NAV ===== -->
+<nav class="nav">
+  <button class="nav-item active" data-page="record" onclick="switchPage('record')">
+    <div class="nav-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <!-- Pinch nose: hand pinching a nose shape -->
+        <path d="M12 4 C12 4, 10 8, 10 10 C10 12, 11 13, 12 13 C13 13, 14 12, 14 10 C14 8, 12 4, 12 4Z"/>
+        <path d="M7 9 C7 9, 8 11, 10 11"/>
+        <path d="M17 9 C17 9, 16 11, 14 11"/>
+        <path d="M8 7 L6 5"/>
+        <path d="M16 7 L18 5"/>
+        <circle cx="12" cy="18" r="2" fill="currentColor" opacity="0.3"/>
+      </svg>
+    </div>
+    Record
+  </button>
+  <button class="nav-item" data-page="history" onclick="switchPage('history')">
+    <div class="nav-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <!-- Scroll with pen -->
+        <path d="M6 3 C4 3, 3 4, 3 6 L3 18 C3 20, 4 21, 6 21 L14 21 C16 21, 17 20, 17 18 L17 6 C17 4, 16 3, 14 3 Z"/>
+        <line x1="7" y1="8" x2="13" y2="8"/>
+        <line x1="7" y1="12" x2="13" y2="12"/>
+        <line x1="7" y1="16" x2="11" y2="16"/>
+        <!-- Pen -->
+        <path d="M19 3 L21 5 L16 10 L14 10 L14 8 Z" fill="currentColor" opacity="0.4"/>
+      </svg>
+    </div>
+    History
+  </button>
+  <button class="nav-item" data-page="stats" onclick="switchPage('stats')">
+    <div class="nav-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <!-- Magnifying glass -->
+        <circle cx="10" cy="10" r="6"/>
+        <line x1="14.5" y1="14.5" x2="20" y2="20"/>
+        <!-- Tiny poo inside -->
+        <ellipse cx="10" cy="11.5" rx="2.5" ry="1.5" fill="currentColor" opacity="0.3"/>
+        <ellipse cx="10" cy="10" rx="1.8" ry="1.2" fill="currentColor" opacity="0.3"/>
+        <ellipse cx="10.2" cy="8.8" rx="1" ry="0.8" fill="currentColor" opacity="0.3"/>
+      </svg>
+    </div>
+    Stats
+  </button>
+</nav>
+
+<script>
+// ===== STATE =====
+let currentStatus = null;
+let currentColor = 'brown';
+let currentSmoothness = 5;
+let currentMood = null;
+let currentMonthOffset = 0;
+let records = [];
+let currentPage = 'record';
+
+const STORAGE_KEY = 'poo-diary-records';
+
+// ===== SUPABASE =====
+const SUPABASE_URL = 'https://vrvmwboedfuhopxlgzvh.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZydm13Ym9lZGZ1aG9weGxnenZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNDE3NjgsImV4cCI6MjA5MzgxNzc2OH0.l5tgAYqrAMUF4XOC6OjGnoahErc0Z7NyFwPUU0l5nB0';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+const PAGE_ORDER = ['record', 'history', 'stats'];
+
+const COLOR_MAP = {
+  brown: '#8B6914', dark: '#5C4A1E', light: '#C49A2A',
+  green: '#6B8E23', yellow: '#DAA520'
+};
+
+const COLOR_LABELS = {
+  brown: 'Healthy', dark: 'Dark', light: 'Light',
+  green: 'Green', yellow: 'Yellow'
+};
+
+const STATUS_FACES = {
+  happy: { eyes: 'happy', mouth: 'smile', blush: true },
+  struggle: { eyes: 'squint', mouth: 'wavy', blush: false },
+  great: { eyes: 'star', mouth: 'big-smile', blush: true },
+  constipated: { eyes: 'angry', mouth: 'flat', blush: false }
+};
+
+const STATUS_LABELS = {
+  happy: 'Smooth', struggle: 'Struggle', great: 'Glorious', constipated: 'Stuck'
+};
+
+const MOOD_EMOJIS = {
+  zen: '😌', happy: '😄', meh: '😐', stressed: '😰', phone: '📱'
+};
+
+const SMOOTHNESS_TEXTS = [
+  '', 'Painful 😭', 'Rough 😬', 'Not great 😕', 'Okay-ish 🤔',
+  'Pretty decent 🙂', 'Good! 😊', 'Smooth 😄', 'Great! 🤩', 'Perfect! 💎', 'LEGENDARY 🏆'
+];
+
+// ===== INIT =====
+function init() {
+  loadRecords();
+  renderPoo('poo-svg');
+  initSlider();
+  updateMonthLabel();
+}
+
+async function loadRecords() {
+  try {
+    const { data, error } = await supabase
+      .from('poo_records')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    
+    // Map Supabase rows to our format
+    records = (data || []).map(r => ({
+      id: r.id,
+      date: r.created_at,
+      status: r.status,
+      color: r.color,
+      smoothness: r.smoothness,
+      mood: r.mood
+    }));
+  } catch(e) {
+    console.error('Failed to load from Supabase, falling back to localStorage:', e);
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      records = stored ? JSON.parse(stored) : [];
+    } catch(e2) { records = []; }
+  }
+}
+
+async function saveRecord(record) {
+  try {
+    const { error } = await supabase
+      .from('poo_records')
+      .insert({
+        status: record.status,
+        color: record.color,
+        smoothness: record.smoothness,
+        mood: record.mood
+      });
+    
+    if (error) throw error;
+    
+    // Reload to get the server-generated id and created_at
+    await loadRecords();
+  } catch(e) {
+    console.error('Failed to save to Supabase, saving to localStorage:', e);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+  }
+}
+
+async function removeRecord(id) {
+  try {
+    const { error } = await supabase
+      .from('poo_records')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+    
+    records = records.filter(r => r.id !== id);
+  } catch(e) {
+    console.error('Failed to delete from Supabase:', e);
+    records = records.filter(r => r.id !== id);
+  }
+}
+
+function saveRecords() {
+  // Legacy fallback, no longer primary
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+}
+
+// ===== POO RENDERING =====
+function generatePooSVG(targetId, color, status) {
+  const col = COLOR_MAP[color] || COLOR_MAP.brown;
+  const face = STATUS_FACES[status] || { eyes: 'default', mouth: 'default', blush: true };
+  const darkerCol = darkenColor(col, 0.2);
+  const lighterCol = lightenColor(col, 0.15);
+  
+  return `
+    <defs>
+      <radialGradient id="pg-${targetId}" cx="40%" cy="35%" r="60%">
+        <stop offset="0%" stop-color="${lighterCol}"/>
+        <stop offset="100%" stop-color="${darkerCol}"/>
+      </radialGradient>
+    </defs>
+    <ellipse cx="70" cy="130" rx="52" ry="28" fill="url(#pg-${targetId})" stroke="${darkerCol}" stroke-width="1.5"/>
+    <ellipse cx="70" cy="100" rx="42" ry="24" fill="url(#pg-${targetId})" stroke="${darkerCol}" stroke-width="1.5"/>
+    <ellipse cx="70" cy="74" rx="32" ry="20" fill="url(#pg-${targetId})" stroke="${darkerCol}" stroke-width="1.5"/>
+    <ellipse cx="72" cy="52" rx="18" ry="16" fill="url(#pg-${targetId})" stroke="${darkerCol}" stroke-width="1.5"/>
+    <path d="M 82 48 Q 90 38, 84 32 Q 78 26, 72 36" fill="url(#pg-${targetId})" stroke="${darkerCol}" stroke-width="1.5"/>
+    <ellipse cx="56" cy="65" rx="6" ry="4" fill="rgba(255,255,255,0.2)" transform="rotate(-20, 56, 65)"/>
+    <ellipse cx="52" cy="95" rx="5" ry="3" fill="rgba(255,255,255,0.15)" transform="rotate(-15, 52, 95)"/>
+    ${renderEyes(face.eyes)}
+    ${renderMouth(face.mouth)}
+    ${face.blush ? renderBlush() : ''}
+  `;
+}
+
+function renderPoo(targetId) {
+  const svg = document.getElementById(targetId);
+  if (!svg) return;
+  svg.innerHTML = generatePooSVG(targetId, currentColor, currentStatus);
+}
+
+function renderEyes(type) {
+  switch(type) {
+    case 'happy':
+      return `
+        <path d="M 55 90 Q 59 84, 63 90" fill="none" stroke="#3a2a1a" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M 77 90 Q 81 84, 85 90" fill="none" stroke="#3a2a1a" stroke-width="2.5" stroke-linecap="round"/>
+      `;
+    case 'squint':
+      return `
+        <line x1="54" y1="88" x2="64" y2="88" stroke="#3a2a1a" stroke-width="2.5" stroke-linecap="round"/>
+        <line x1="76" y1="88" x2="86" y2="88" stroke="#3a2a1a" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M 90 78 Q 92 82, 90 86 Q 88 82, 90 78" fill="#67e8f9" opacity="0.7"/>
+      `;
+    case 'star':
+      return `
+        <text x="55" y="93" font-size="16" text-anchor="middle">⭐</text>
+        <text x="85" y="93" font-size="16" text-anchor="middle">⭐</text>
+      `;
+    case 'angry':
+      return `
+        <line x1="53" y1="84" x2="63" y2="88" stroke="#3a2a1a" stroke-width="2.5" stroke-linecap="round"/>
+        <line x1="87" y1="84" x2="77" y2="88" stroke="#3a2a1a" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="58" cy="92" r="3" fill="#3a2a1a"/>
+        <circle cx="82" cy="92" r="3" fill="#3a2a1a"/>
+      `;
+    default:
+      return `
+        <circle cx="58" cy="88" r="4" fill="#3a2a1a"/>
+        <circle cx="82" cy="88" r="4" fill="#3a2a1a"/>
+        <ellipse cx="59.5" cy="87" rx="1.5" ry="1.5" fill="white"/>
+        <ellipse cx="83.5" cy="87" rx="1.5" ry="1.5" fill="white"/>
+      `;
+  }
+}
+
+function renderMouth(type) {
+  switch(type) {
+    case 'smile':
+      return `<path d="M 62 102 Q 70 112, 78 102" fill="none" stroke="#3a2a1a" stroke-width="2.5" stroke-linecap="round"/>`;
+    case 'wavy':
+      return `<path d="M 60 105 Q 65 100, 70 105 Q 75 110, 80 105" fill="none" stroke="#3a2a1a" stroke-width="2.5" stroke-linecap="round"/>`;
+    case 'big-smile':
+      return `
+        <path d="M 58 100 Q 70 116, 82 100" fill="#3a2a1a" stroke="#3a2a1a" stroke-width="1"/>
+        <path d="M 62 108 Q 70 104, 78 108" fill="#ff8fa3" stroke="none"/>
+      `;
+    case 'flat':
+      return `<line x1="62" y1="105" x2="78" y2="105" stroke="#3a2a1a" stroke-width="2.5" stroke-linecap="round"/>`;
+    default:
+      return `<path d="M 64 104 Q 70 110, 76 104" fill="none" stroke="#3a2a1a" stroke-width="2" stroke-linecap="round"/>`;
+  }
+}
+
+function renderBlush() {
+  return `
+    <ellipse cx="48" cy="98" rx="7" ry="4" fill="rgba(255,107,157,0.5)" opacity="0.6"/>
+    <ellipse cx="92" cy="98" rx="7" ry="4" fill="rgba(255,107,157,0.5)" opacity="0.6"/>
+  `;
+}
+
+function darkenColor(hex, amount) {
+  const r = Math.max(0, parseInt(hex.slice(1,3), 16) * (1 - amount));
+  const g = Math.max(0, parseInt(hex.slice(3,5), 16) * (1 - amount));
+  const b = Math.max(0, parseInt(hex.slice(5,7), 16) * (1 - amount));
+  return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+}
+
+function lightenColor(hex, amount) {
+  const r = Math.min(255, parseInt(hex.slice(1,3), 16) * (1 + amount));
+  const g = Math.min(255, parseInt(hex.slice(3,5), 16) * (1 + amount));
+  const b = Math.min(255, parseInt(hex.slice(5,7), 16) * (1 + amount));
+  return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+}
+
+// ===== POO INTERACTION =====
+function pokePoo() {
+  const poo = document.getElementById('main-poo');
+  const anims = ['bounce', 'spin', 'wiggle'];
+  const anim = anims[Math.floor(Math.random() * anims.length)];
+  poo.classList.remove('bounce', 'spin', 'wiggle');
+  poo.style.animation = 'none';
+  poo.offsetHeight;
+  poo.classList.add(anim);
+  setTimeout(() => {
+    poo.classList.remove(anim);
+    poo.style.animation = '';
+  }, 600);
+}
+
+// ===== SELECTIONS =====
+function selectStatus(el) {
+  document.querySelectorAll('.status-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  currentStatus = el.dataset.status;
+  renderPoo('poo-svg');
+  pokePoo();
+}
+
+function selectColor(el) {
+  document.querySelectorAll('.color-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  currentColor = el.dataset.color;
+  renderPoo('poo-svg');
+  
+  const poo = document.getElementById('main-poo');
+  poo.classList.remove('bounce');
+  poo.style.animation = 'none';
+  poo.offsetHeight;
+  poo.classList.add('bounce');
+  setTimeout(() => {
+    poo.classList.remove('bounce');
+    poo.style.animation = '';
+  }, 500);
+}
+
+function selectMood(el) {
+  document.querySelectorAll('.mood-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  currentMood = el.dataset.mood;
+}
+
+// ===== SLIDER =====
+function initSlider() {
+  const track = document.getElementById('slider-track');
+  let isDragging = false;
+
+  function updateSlider(x) {
+    const rect = track.getBoundingClientRect();
+    let pct = (x - rect.left) / rect.width;
+    pct = Math.max(0, Math.min(1, pct));
+    const val = Math.round(pct * 10);
+    currentSmoothness = val === 0 ? 1 : val;
+    
+    document.getElementById('slider-fill').style.width = (currentSmoothness * 10) + '%';
+    document.getElementById('slider-thumb').style.left = (currentSmoothness * 10) + '%';
+    document.getElementById('smoothness-val').textContent = currentSmoothness;
+    document.getElementById('smoothness-text').textContent = SMOOTHNESS_TEXTS[currentSmoothness];
+  }
+
+  track.addEventListener('mousedown', (e) => { isDragging = true; updateSlider(e.clientX); });
+  document.addEventListener('mousemove', (e) => { if (isDragging) updateSlider(e.clientX); });
+  document.addEventListener('mouseup', () => isDragging = false);
+  
+  track.addEventListener('touchstart', (e) => { isDragging = true; updateSlider(e.touches[0].clientX); }, { passive: true });
+  document.addEventListener('touchmove', (e) => { if (isDragging) updateSlider(e.touches[0].clientX); }, { passive: true });
+  document.addEventListener('touchend', () => isDragging = false);
+}
+
+// ===== SUBMIT =====
+async function submitRecord() {
+  if (!currentStatus || !currentMood) {
+    const btn = document.getElementById('submit-btn');
+    btn.textContent = '☝️ Pick status & mood first!';
+    btn.style.background = 'var(--bg-card)';
+    setTimeout(() => {
+      btn.textContent = '🚽 Flush & Record!';
+      btn.style.background = '';
+    }, 2000);
+    return;
+  }
+
+  const record = {
+    status: currentStatus,
+    color: currentColor,
+    smoothness: currentSmoothness,
+    mood: currentMood
+  };
+
+  // Add to local array immediately for UI
+  records.push({
+    id: Date.now(),
+    date: new Date().toISOString(),
+    ...record
+  });
+  
+  playFlushAnimation();
+  
+  // Save to Supabase in background
+  await saveRecord(record);
+}
+
+function playFlushAnimation() {
+  const overlay = document.getElementById('flush-overlay');
+  const water = document.getElementById('flush-water');
+  const water2 = document.getElementById('flush-water-2');
+  const poowrap = document.getElementById('flush-poo');
+  const text = document.getElementById('flush-text');
+  const success = document.getElementById('flush-success');
+
+  // Render the flush poo with current selections
+  const flushSvg = document.getElementById('flush-poo-svg');
+  flushSvg.innerHTML = generatePooSVG('flush-poo-svg', currentColor, currentStatus);
+
+  overlay.classList.add('active');
+  
+  setTimeout(() => {
+    water.classList.add('animate');
+    water2.classList.add('animate');
+    poowrap.classList.add('animate');
+    text.classList.add('show');
+    success.classList.add('show');
+  }, 100);
+
+  setTimeout(() => {
+    overlay.classList.remove('active');
+    water.classList.remove('animate');
+    water2.classList.remove('animate');
+    poowrap.classList.remove('animate');
+    text.classList.remove('show');
+    success.classList.remove('show');
+    
+    currentStatus = null;
+    currentMood = null;
+    currentColor = 'brown';
+    currentSmoothness = 5;
+    document.querySelectorAll('.status-option').forEach(o => o.classList.remove('selected'));
+    document.querySelectorAll('.mood-option').forEach(o => o.classList.remove('selected'));
+    document.querySelectorAll('.color-option').forEach(o => o.classList.remove('selected'));
+    document.querySelector('[data-color="brown"]').classList.add('selected');
+    document.getElementById('slider-fill').style.width = '50%';
+    document.getElementById('slider-thumb').style.left = '50%';
+    document.getElementById('smoothness-val').textContent = '5';
+    document.getElementById('smoothness-text').textContent = SMOOTHNESS_TEXTS[5];
+    renderPoo('poo-svg');
+  }, 3000);
+}
+
+// ===== PAGES (directional transitions + tab animations) =====
+function switchPage(page) {
+  if (page === currentPage) return;
+  
+  const oldIndex = PAGE_ORDER.indexOf(currentPage);
+  const newIndex = PAGE_ORDER.indexOf(page);
+  const goingRight = newIndex > oldIndex;
+  
+  // Animate out current page
+  const oldPage = document.getElementById(`page-${currentPage}`);
+  oldPage.classList.remove('active');
+  oldPage.classList.add(goingRight ? 'exit-left' : 'exit-right');
+  
+  // Prepare new page entry direction
+  const newPage = document.getElementById(`page-${page}`);
+  newPage.classList.remove('exit-left', 'exit-right', 'enter-left', 'enter-right');
+  newPage.classList.add(goingRight ? 'enter-right' : 'enter-left');
+  
+  // Update nav
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const activeNav = document.querySelector(`[data-page="${page}"]`);
+  activeNav.classList.add('active');
+  
+  // Trigger tab icon animation
+  const animClass = `anim-${page}`;
+  activeNav.classList.remove(animClass);
+  activeNav.offsetHeight; // force reflow
+  activeNav.classList.add(animClass);
+  setTimeout(() => activeNav.classList.remove(animClass), 500);
+  
+  // Animate in new page
+  setTimeout(() => {
+    oldPage.classList.remove('exit-left', 'exit-right');
+    newPage.classList.remove('enter-left', 'enter-right');
+    newPage.classList.add('active');
+  }, 50);
+
+  currentPage = page;
+  
+  if (page === 'history') renderHistory();
+  if (page === 'stats') renderStats();
+}
+
+// ===== HISTORY =====
+function updateMonthLabel() {
+  const now = new Date();
+  now.setMonth(now.getMonth() + currentMonthOffset);
+  const label = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  document.getElementById('month-label').textContent = label;
+}
+
+function changeMonth(dir) {
+  currentMonthOffset += dir;
+  updateMonthLabel();
+  renderHistory();
+}
+
+function renderHistory() {
+  updateMonthLabel();
+  const list = document.getElementById('history-list');
+  const now = new Date();
+  now.setMonth(now.getMonth() + currentMonthOffset);
+  const targetMonth = now.getMonth();
+  const targetYear = now.getFullYear();
+
+  const filtered = records.filter(r => {
+    const d = new Date(r.date);
+    return d.getMonth() === targetMonth && d.getFullYear() === targetYear;
+  }).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  if (filtered.length === 0) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-emoji">🚽</div>
+        <div class="empty-state-text">No records this month</div>
+        <div class="empty-state-sub">Your toilet awaits!</div>
+      </div>
+    `;
+    return;
+  }
+
+  list.innerHTML = filtered.map((r, i) => {
+    const d = new Date(r.date);
+    const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const svgId = `hist-poo-${r.id}`;
+    const svgContent = generatePooSVG(svgId, r.color, r.status);
+    return `
+      <div class="history-card" style="animation-delay: ${i * 0.05}s">
+        <svg class="history-poo-svg" viewBox="0 0 140 160">${svgContent}</svg>
+        <div class="history-info">
+          <div class="history-date">${dateStr}</div>
+          <div class="history-details">
+            <span class="history-tag">${STATUS_LABELS[r.status] || r.status}</span>
+            <span class="history-tag">${COLOR_LABELS[r.color] || r.color}</span>
+            <span class="history-tag">✨ ${r.smoothness}/10</span>
+          </div>
+        </div>
+        <div class="history-mood">${MOOD_EMOJIS[r.mood] || '🤔'}</div>
+        <button class="delete-btn" onclick="deleteRecord(${r.id})">✕</button>
+      </div>
+    `;
+  }).join('');
+}
+
+async function deleteRecord(id) {
+  await removeRecord(id);
+  renderHistory();
+  renderStats();
+}
+
+// ===== STATS =====
+function renderStats() {
+  document.getElementById('total-count').textContent = records.length;
+
+  if (records.length > 0) {
+    const avg = records.reduce((sum, r) => sum + r.smoothness, 0) / records.length;
+    document.getElementById('avg-smooth').textContent = avg.toFixed(1);
+  } else {
+    document.getElementById('avg-smooth').textContent = '-';
+  }
+
+  const streakEl = document.getElementById('streak-display');
+  const today = new Date();
+  let streakHTML = '';
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const dayStr = d.toLocaleDateString('en-US', { weekday: 'narrow' });
+    const hasRecord = records.some(r => new Date(r.date).toDateString() === d.toDateString());
+    streakHTML += `<div class="streak-day ${hasRecord ? 'filled' : 'empty'}">${hasRecord ? '💩' : dayStr}</div>`;
+  }
+  streakEl.innerHTML = streakHTML;
+
+  const moodEl = document.getElementById('mood-stats');
+  const moodCounts = {};
+  records.forEach(r => { moodCounts[r.mood] = (moodCounts[r.mood] || 0) + 1; });
+  
+  moodEl.innerHTML = Object.entries(MOOD_EMOJIS).map(([key, emoji]) => `
+    <div class="mood-stat-item">
+      <div class="mood-stat-emoji">${emoji}</div>
+      <div class="mood-stat-count">${moodCounts[key] || 0}</div>
+      <div class="mood-stat-label">${key}</div>
+    </div>
+  `).join('');
+
+  const chartEl = document.getElementById('smoothness-chart');
+  let chartHTML = '';
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const dayLabel = d.toLocaleDateString('en-US', { weekday: 'narrow' });
+    const dayRecords = records.filter(r => new Date(r.date).toDateString() === d.toDateString());
+    const avgSmooth = dayRecords.length > 0 
+      ? dayRecords.reduce((s, r) => s + r.smoothness, 0) / dayRecords.length 
+      : 0;
+    const heightPct = avgSmooth * 10;
+    chartHTML += `
+      <div class="chart-bar-wrapper">
+        <div class="chart-bar" style="height: ${heightPct}%"></div>
+        <div class="chart-label">${dayLabel}</div>
+      </div>
+    `;
+  }
+  chartEl.innerHTML = chartHTML;
+}
+
+// ===== START =====
+async function init() {
+  await loadRecords();
+  renderPoo('poo-svg');
+  initSlider();
+  updateMonthLabel();
+}
+
+// Register service worker for PWA
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+init();
+</script>
+</body>
+</html>
