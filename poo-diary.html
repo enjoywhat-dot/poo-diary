@@ -897,7 +897,15 @@ const STORAGE_KEY = 'poo-diary-records';
 // ===== SUPABASE =====
 const SUPABASE_URL = 'https://vrvmwboedfuhopxlgzvh.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZydm13Ym9lZGZ1aG9weGxnenZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNDE3NjgsImV4cCI6MjA5MzgxNzc2OH0.l5tgAYqrAMUF4XOC6OjGnoahErc0Z7NyFwPUU0l5nB0';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+let sb = null;
+try {
+  if (window.supabase && window.supabase.createClient) {
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+  }
+} catch(e) {
+  console.warn('Supabase client failed to init, using localStorage');
+}
 const PAGE_ORDER = ['record', 'history', 'stats'];
 
 const COLOR_MAP = {
@@ -930,76 +938,76 @@ const SMOOTHNESS_TEXTS = [
   'Pretty decent 🙂', 'Good! 😊', 'Smooth 😄', 'Great! 🤩', 'Perfect! 💎', 'LEGENDARY 🏆'
 ];
 
-// ===== INIT =====
-function init() {
-  loadRecords();
-  renderPoo('poo-svg');
-  initSlider();
-  updateMonthLabel();
-}
-
+// ===== DATA =====
 async function loadRecords() {
-  try {
-    const { data, error } = await supabase
-      .from('poo_records')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    if (error) throw error;
-    
-    // Map Supabase rows to our format
-    records = (data || []).map(r => ({
-      id: r.id,
-      date: r.created_at,
-      status: r.status,
-      color: r.color,
-      smoothness: r.smoothness,
-      mood: r.mood
-    }));
-  } catch(e) {
-    console.error('Failed to load from Supabase, falling back to localStorage:', e);
+  if (sb) {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      records = stored ? JSON.parse(stored) : [];
-    } catch(e2) { records = []; }
+      const { data, error } = await sb
+        .from('poo_records')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      records = (data || []).map(r => ({
+        id: r.id,
+        date: r.created_at,
+        status: r.status,
+        color: r.color,
+        smoothness: r.smoothness,
+        mood: r.mood
+      }));
+      return;
+    } catch(e) {
+      console.error('Supabase load failed, falling back:', e);
+    }
   }
+  // Fallback to localStorage
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    records = stored ? JSON.parse(stored) : [];
+  } catch(e) { records = []; }
 }
 
 async function saveRecord(record) {
-  try {
-    const { error } = await supabase
-      .from('poo_records')
-      .insert({
-        status: record.status,
-        color: record.color,
-        smoothness: record.smoothness,
-        mood: record.mood
-      });
-    
-    if (error) throw error;
-    
-    // Reload to get the server-generated id and created_at
-    await loadRecords();
-  } catch(e) {
-    console.error('Failed to save to Supabase, saving to localStorage:', e);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+  if (sb) {
+    try {
+      const { error } = await sb
+        .from('poo_records')
+        .insert({
+          status: record.status,
+          color: record.color,
+          smoothness: record.smoothness,
+          mood: record.mood
+        });
+      
+      if (error) throw error;
+      await loadRecords();
+      return;
+    } catch(e) {
+      console.error('Supabase save failed, using localStorage:', e);
+    }
   }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
 }
 
 async function removeRecord(id) {
-  try {
-    const { error } = await supabase
-      .from('poo_records')
-      .delete()
-      .eq('id', id);
-    
-    if (error) throw error;
-    
-    records = records.filter(r => r.id !== id);
-  } catch(e) {
-    console.error('Failed to delete from Supabase:', e);
-    records = records.filter(r => r.id !== id);
+  if (sb) {
+    try {
+      const { error } = await sb
+        .from('poo_records')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      records = records.filter(r => r.id !== id);
+      return;
+    } catch(e) {
+      console.error('Supabase delete failed:', e);
+    }
   }
+  records = records.filter(r => r.id !== id);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
 }
 
 function saveRecords() {
